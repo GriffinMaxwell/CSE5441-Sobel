@@ -1,29 +1,31 @@
 # Compilers & flags
-CUDA := nvcc
-CUDAFLAGS := -arch=sm_60 -O -Wno-deprecated-gpu-targets
+MPI := mpicc
+MPI_FLAGS := -O3 -fopenmp
 
 # Paths
 BUILD_DIR := Build
 SRC_DIR := Source
 
 # Targets
-TARGET_PART1 := lab4p1
-TARGET_PART2 := lab4p2
+TARGET_LAB5 := lab5.out
 
 TARGET_EXECUTABLES := \
-	$(TARGET_PART1) \
-	$(TARGET_PART2) \
+	$(TARGET_LAB5) \
 
 # Objects
-OBJ_PART2 := \
+OBJS := \
+	maxwell_griffin_lab5.o
 	Sobel.o \
 	Stencil.o \
 
-LIB_OBJ_PART2 := \
-	nvcc60_bmpReader.o \
+PROTECTED_OBJS := \
+	bmpReader.o \
 
 
 all: $(TARGET_EXECUTABLES)
+
+$(TARGET_LAB5): $(OBJS)
+	$(MPICC) $(MPI_FLAGS) -o $@ $(OBJS) $(PROTECTED_OBJS)
 
 $(TARGET_PART1):
 	$(CUDA) -o $@ maxwell_griffin_$@.cu $(CUDAFLAGS)
@@ -33,9 +35,9 @@ $(TARGET_PART2): $(OBJ_PART2)
 	$(CUDA) -o $@ maxwell_griffin_$@.o $(LIB_OBJ_PART2) $^ $(CUDAFLAGS)
 
 %.o: %.c
-	$(CUDA) -x c -c -o $@ $< $(CUDAFLAGS)
+	$(MPI) $(MPI_FLAGS) -c -o $@ $<
 
 .PHONY: clean
 clean:
 	@echo Cleaning build files...
-	@rm -f $(TARGET_EXECUTABLES)
+	@rm -f $(TARGET_EXECUTABLES) $(OBJS)
