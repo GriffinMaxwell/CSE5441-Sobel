@@ -165,8 +165,9 @@ int main(int argc, char *argv[])
    int communicatorSize, myRank, masterProcessRank;
    int slaveBlockSize, myBlockSize, myBufferSize;
    int myInputOffset, myOutputOffset, numExtraPixels;
+   int outputBlockSizes[communicatorSize], outputBlockOffsets[communicatorSize];
    int convergenceThreshold;
-   uint8_t *inputImageBuffer, *outputImageBuffer;
+   uint8_t *inputImageBuffer, *outputImageBuffer, myOutputImageBuffer;
    FILE *inputFile;
 
    MPI_Comm_size(MPI_COMM_WORLD, &communicatorSize);
@@ -201,17 +202,26 @@ int main(int argc, char *argv[])
    // The master process gets the whole image buffer, plus the extra pixels from
    // uneven division between the blocks
    myBlockSize = (myRank == masterProcessRank) ? slaveBlockSize + numExtraPixels : slaveBlockSize;
-   myBufferSize = (myRank == masterProcessRank) ? get_num_pixel() : myBlockSize;
    myInputOffset = myRank * slaveBlockSize;
    myOutputOffset = (myRank == masterProcessRank) ? myInputOffset : 0;
 
-   outputImageBuffer = (uint8_t *)malloc(myBufferSize);
+   outputBlockSizes[communicatorSize - 1] += numExtraPixels;
+   outputImageBuffer = (uint8_t *)malloc(get_num_pixel());
+
+   myOutputImageBuffer = (uint8_t *)malloc(myBlockSize);
 
    // Wait for all processes to read the image and allocate buffers
    MPI_Barrier(MPI_COMM_WORLD);
 
    if(myRank == masterProcessRank)
    {
+      int i;
+      for(i = 0; i <= communicatorSize - 1; i++)
+      {
+         outputBlockSizes[i] = slaveBlockSize;
+         outputBlockOffsets[i] = slaveBlockSize * i;
+      }
+
       DisplayParameters(argv[1], argv[2], get_image_height(), get_image_width());
 
       printf("Performing Sobel edge detection.\n");
@@ -220,7 +230,7 @@ int main(int argc, char *argv[])
 
    convergenceThreshold = BlockSobelEdgeDetection(
       inputImageBuffer,
-      &outputImageBuffer[myOutputOffset],
+      myOutputImageBuffer,
       get_image_height(),
       get_image_width(),
       myInputOffset,
@@ -229,9 +239,9 @@ int main(int argc, char *argv[])
    // Fill output pixel array with the pixels from all the processes
    // Note: the the master process' pixels were written to their final spot in
    // this buffer so they won't be stomped on and the extra pixels are already at the very end of the buffer
-   MPI_Gather(
-      &outputImageBuffer[myOutputOffset], slaveBlockSize, MPI_UNSIGNED_CHAR,
-      outputImageBuffer, slaveBlockSize, MPI_UNSIGNED_CHAR,
+   MPI_Gatherv(
+      myOutputImageBuffer, slaveBlockSize, MPI_UNSIGNED_CHAR,
+      outputImageBuffer, outputBlockSizes, outputBlockOffsets, MPI_UNSIGNED_CHAR,
       masterProcessRank, MPI_COMM_WORLD);
 
    if(myRank == masterProcessRank)
@@ -247,10 +257,8 @@ int main(int argc, char *argv[])
       FILE *outputFile = fopen(argv[2], "wb");
       write_bmp_file(outputFile, outputImageBuffer);
    }
-   else
-   {
-      free(outputImageBuffer);   // outputImageBuffer is already freed in master process by write_bmp_file()
-   }
+
+   free(myOutputImageBuffer);
 
    MPI_Finalize();
 }
