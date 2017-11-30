@@ -165,13 +165,14 @@ int main(int argc, char *argv[])
    int communicatorSize, myRank, masterProcessRank;
    int slaveBlockSize, myBlockSize, myBufferSize;
    int myInputOffset, myOutputOffset, numExtraPixels;
-   int outputBlockSizes[communicatorSize], outputBlockOffsets[communicatorSize];
    int convergenceThreshold;
    uint8_t *inputImageBuffer, *outputImageBuffer, *myOutputImageBuffer;
    FILE *inputFile;
 
    MPI_Comm_size(MPI_COMM_WORLD, &communicatorSize);
    MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
+
+   int outputBlockSizes[communicatorSize], outputBlockOffsets[communicatorSize];
 
    // Define the "master process" as the process with the largest rank
    // Rank is zero indexed, so largest rank is communicator size - 1
