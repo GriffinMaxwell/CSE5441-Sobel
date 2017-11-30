@@ -230,8 +230,8 @@ int main(int argc, char *argv[])
    // Note: the the master process' pixels were written to their final spot in
    // this buffer so they won't be stomped on and the extra pixels are already at the very end of the buffer
    MPI_Gather(
+      &outputImageBuffer[myOutputOffset], slaveBlockSize, MPI_UNSIGNED_CHAR,
       outputImageBuffer, slaveBlockSize, MPI_UNSIGNED_CHAR,
-      inputImageBuffer, slaveBlockSize, MPI_UNSIGNED_CHAR,
       masterProcessRank, MPI_COMM_WORLD);
 
    if(myRank == masterProcessRank)
