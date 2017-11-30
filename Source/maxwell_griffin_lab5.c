@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
    int myInputOffset, myOutputOffset, numExtraPixels;
    int outputBlockSizes[communicatorSize], outputBlockOffsets[communicatorSize];
    int convergenceThreshold;
-   uint8_t *inputImageBuffer, *outputImageBuffer, myOutputImageBuffer;
+   uint8_t *inputImageBuffer, *outputImageBuffer, *myOutputImageBuffer;
    FILE *inputFile;
 
    MPI_Comm_size(MPI_COMM_WORLD, &communicatorSize);
@@ -205,9 +205,6 @@ int main(int argc, char *argv[])
    myInputOffset = myRank * slaveBlockSize;
    myOutputOffset = (myRank == masterProcessRank) ? myInputOffset : 0;
 
-   outputBlockSizes[communicatorSize - 1] += numExtraPixels;
-   outputImageBuffer = (uint8_t *)malloc(get_num_pixel());
-
    myOutputImageBuffer = (uint8_t *)malloc(myBlockSize);
 
    // Wait for all processes to read the image and allocate buffers
@@ -221,6 +218,9 @@ int main(int argc, char *argv[])
          outputBlockSizes[i] = slaveBlockSize;
          outputBlockOffsets[i] = slaveBlockSize * i;
       }
+      outputBlockSizes[communicatorSize - 1] += numExtraPixels;   // Add extra pixels to last block
+
+      outputImageBuffer = (uint8_t *)malloc(get_num_pixel());
 
       DisplayParameters(argv[1], argv[2], get_image_height(), get_image_width());
 
