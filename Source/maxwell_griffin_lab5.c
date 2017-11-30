@@ -111,14 +111,6 @@ static int BlockSobelEdgeDetection(
    int initialOffset,
    int blockSize)
 {
-   // Correct for initialOffset that is before the first testable pixel by
-   // setting it directly to (1,1) and adjusting the block size
-   if(initialOffset < LINEARIZE(1, 1, width))
-   {
-      initialOffset = width + 1;
-      blockSize -= width + 1;
-   }
-
    int gradientThreshold, myBlackPixelCount = 0, totalBlackPixelCount = 0;
    for(gradientThreshold = 0; totalBlackPixelCount < (height * width * 3 / 4); gradientThreshold++)
    {
@@ -185,9 +177,9 @@ int main(int argc, char *argv[])
    masterProcessRank = communicatorSize - 1;
 
    // Check for correct number of remaining command line args
-   if (argc != 4)
+   if (argc != 3)
    {
-      printf("Error: Incorrect arguments: <input.bmp> <serial_output.bmp> <cuda_output.bmp>\n");
+      printf("Error: Incorrect arguments: <input.bmp> <output.bmp>\n");
       return 0;
    }
 
