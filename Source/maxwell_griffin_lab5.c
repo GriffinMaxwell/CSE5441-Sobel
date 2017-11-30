@@ -5,6 +5,7 @@
  */
 
 #include <mpi.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -29,8 +30,8 @@
  */
 static double CalculateExecutionTime(struct timespec start, struct timespec end)
 {
-   return (LINEARIZE(rtcEnd.tv_sec, rtcEnd.tv_nsec, NS_PER_SEC)
-      - LINEARIZE(rtcStart.tv_sec, rtcStart.tv_nsec, NS_PER_SEC))
+   return (LINEARIZE(end.tv_sec, end.tv_nsec, NS_PER_SEC)
+      - LINEARIZE(start.tv_sec, start.tv_nsec, NS_PER_SEC))
       / ((double)NS_PER_SEC);
 }
 
@@ -86,7 +87,7 @@ bool IsBorderPixel(int offset, int height, int width)
    return ((offset < width)
       || (offset >= (width * (height - 1)))
       || (offset % width == 0)
-      || (offset % width == (width - 1)))
+      || (offset % width == (width - 1)));
 }
 
 /*
@@ -146,7 +147,7 @@ static int BlockSobelEdgeDetection(
             else
             {
                output[i] = PIXEL_BLACK;
-               blackPixelCount++;
+               myBlackPixelCount++;
             }
          }
 
@@ -171,7 +172,7 @@ int main(int argc, char *argv[])
    struct timespec rtcStart, rtcEnd;
    int communicatorSize, myRank, masterProcessRank;
    int slaveBlockSize, myBlockSize, myBufferSize;
-   int myInputOffset myOutputOffset, numExtraPixels;
+   int myInputOffset, myOutputOffset, numExtraPixels;
    int convergenceThreshold;
    uint8_t *inputImageBuffer, *outputImageBuffer;
    FILE *inputFile;
