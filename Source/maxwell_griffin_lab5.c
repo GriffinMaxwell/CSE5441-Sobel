@@ -248,7 +248,7 @@ int main(int argc, char *argv[])
 
       DisplayResults(
          communicatorSize,
-         executionTime(rtcStart, rtcEnd),
+         CalculateExecutionTime(rtcStart, rtcEnd),
          convergenceThreshold);
 
       // Write output image buffers. Closes files and frees buffers.
