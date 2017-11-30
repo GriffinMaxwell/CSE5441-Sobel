@@ -5,6 +5,7 @@
  */
 
 #include <mpi.h>
+#include <omp.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -50,7 +51,7 @@ static void DisplayParameters(
    int imageWidth)
 {
    printf("********************************************************************************\n");
-   printf("lab5: Sobel edge detection using MPI.\n");
+   printf("lab5: Sobel edge detection using MPI and OpenMP.\n");
    printf("\n");
    printf("Input image: %s \t(Height: %d pixels, width: %d pixels)\n", inputFile, imageHeight, imageWidth);
    printf("Output image: \t%s\n", outputFile);
@@ -61,16 +62,19 @@ static void DisplayParameters(
  * Display the MPI paramaters and timing and convergence results to the screen.
  *
  * @param communicatorSize
+ * @param ompNumThreads
  * @param executionTime
  * @param convergenceThreshold
  */
 static void DisplayResults(
    int communicatorSize,
+   int ompNumThreads,
    double executionTime,
    int convergenceThreshold)
 {
    printf("MPI communicator size: %d\n", communicatorSize);
-   printf("Time taken for MPI operation: %lf\n", executionTime);
+   printf("OpenMP number of threads: %d\n", ompNumThreads);
+   printf("Time taken for MPI/OMP operation: %lf\n", executionTime);
    printf("Convergence Threshold: %d\n", convergenceThreshold);
    printf("********************************************************************************\n");
 }
@@ -101,6 +105,7 @@ bool IsBorderPixel(int offset, int height, int width)
  * @param width -- width of pixel image
  * @param initialOffset -- the offset within the input buffer to start testing pixels
  * @param blockSize -- i.e. the number of pixels in the output pixel buffer
+ * @param ompNumThreads -- storage for the number of threads in the OpenMP parallel section
  * @return -- gradient threshold at which PERCENT_BLACK_THRESHOLD pixels are black
  */
 static int BlockSobelEdgeDetection(
@@ -109,23 +114,30 @@ static int BlockSobelEdgeDetection(
    int height,
    int width,
    int initialOffset,
-   int blockSize)
+   int blockSize,
+   int *ompNumThreads)
 {
    int gradientThreshold, myBlackPixelCount = 0, totalBlackPixelCount = 0;
    for(gradientThreshold = 0; totalBlackPixelCount < (height * width * 3 / 4); gradientThreshold++)
    {
       myBlackPixelCount = 0;
 
-      // Initialize stencil to sit centered at input[1][1]
-      Stencil_t pixel = {
-         .top =    input + initialOffset - width,
-         .middle = input + initialOffset,
-         .bottom = input + initialOffset + width
-      };
-
       int i;
+      #pragma omp parallel for reduction( + : myBlackPixelCount)
       for(i = 0; i < blockSize; i++)
       {
+         if(i == 0)
+         {
+            *ompNumThreads = omp_get_num_threads();
+         }
+
+         uint8_t *middlePixel = input + initialOffset + i;
+         Stencil_t pixel = {
+            .top =    middlePixel - width,
+            .middle = middlePixel,
+            .bottom = middlePixel + width
+         };
+
          if(IsBorderPixel(initialOffset + i, height, width))
          {
             output[i] = PIXEL_BLACK;
@@ -142,8 +154,6 @@ static int BlockSobelEdgeDetection(
                myBlackPixelCount++;
             }
          }
-
-         Stencil_MoveRight(&pixel);
       }
 
       // Get the total black pixel count from all processes
@@ -162,6 +172,7 @@ int main(int argc, char *argv[])
    MPI_Init(&argc, &argv);
 
    struct timespec rtcStart, rtcEnd;
+   int ompNumThreads;
    int communicatorSize, myRank, masterProcessRank;
    int slaveBlockSize, myBlockSize, myBufferSize;
    int myInputOffset, myOutputOffset, numExtraPixels;
@@ -235,7 +246,8 @@ int main(int argc, char *argv[])
       get_image_height(),
       get_image_width(),
       myInputOffset,
-      myBlockSize);
+      myBlockSize,
+      &ompNumThreads);
 
    // Fill output pixel array with the pixels from all the processes
    // Note: the the master process' pixels were written to their final spot in
@@ -251,6 +263,7 @@ int main(int argc, char *argv[])
 
       DisplayResults(
          communicatorSize,
+         ompNumThreads,
          CalculateExecutionTime(rtcStart, rtcEnd),
          convergenceThreshold);
 
