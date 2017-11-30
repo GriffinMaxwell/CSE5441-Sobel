@@ -5,6 +5,7 @@
  */
 
 #include <mpi.h>
+#include <omp.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -124,6 +125,7 @@ static int BlockSobelEdgeDetection(
       };
 
       int i;
+      #pragma omp parallel for
       for(i = 0; i < blockSize; i++)
       {
          if(IsBorderPixel(initialOffset + i, height, width))
