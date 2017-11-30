@@ -82,13 +82,13 @@ static void DisplayResults(
  * Determines if a pixel is on the border of an image.
  *
  * @param offset -- offset of the pixel within the image buffer
+ * @param `height -- `total height of the image
  * @param width -- total width of the image
- * @param height -- total height of the image
  */
-bool IsBorderPixel(int offset, int width, int height)
+bool IsBorderPixel(int offset, int height, int width)
 {
    return ((offset < width)
-      || (offset > (width * (height - 1)))
+      || (offset >= (width * (height - 1)))
       || (offset % width == 0)
       || (offset % width == (width - 1)))
 }
@@ -114,6 +114,14 @@ static int BlockSobelEdgeDetection(
    int initialOffset,
    int blockSize)
 {
+   // Correct for initialOffset that is before the first testable pixel by
+   // setting it directly to (1,1) and adjusting the block size
+   if(initialOffset < LINEARIZE(1, 1, width))
+   {
+      initialOffset = width + 1;
+      blockSize -= width + 1;
+   }
+
    int gradientThreshold, myBlackPixelCount = 0, totalBlackPixelCount = 0;
    for(gradientThreshold = 0; totalBlackPixelCount < (height * width * 3 / 4); gradientThreshold++)
    {
@@ -121,31 +129,32 @@ static int BlockSobelEdgeDetection(
 
       // Initialize stencil to sit centered at input[1][1]
       Stencil_t pixel = {
-         .top =    &input[LINEARIZE(0, 0, width)],
-         .middle = &input[LINEARIZE(1, 0, width)],
-         .bottom = &input[LINEARIZE(2, 0, width)]
+         .top =    input + initialOffset - width,
+         .middle = input + initialOffset,
+         .bottom = input + initialOffset + width
       };
 
-      // Skip first and last row (to avoid top/bottom boundaries)
-      for(int row = 1; row < (height - 1); row++)
+      int i;
+      for(i = 0; i < blockSize; i++)
       {
-         // Skip first and last column (to avoid left/right boundaries)
-         for(int col = 1; col < (width - 1); col++)
+         if(IsBorderPixel(i, height, width))
+         {
+               output[i] = PIXEL_BLACK;
+         }
+         else
          {
             if(Sobel_Magnitude(&pixel) > gradientThreshold)
             {
-               output[LINEARIZE(row, col, width)] = PIXEL_WHITE;
+               output[i] = PIXEL_WHITE;
             }
             else
             {
-               output[LINEARIZE(row, col, width)] = PIXEL_BLACK;
+               output[i] = PIXEL_BLACK;
                blackPixelCount++;
             }
-
-            Stencil_MoveRight(&pixel);
          }
 
-         Stencil_MoveToNextRow(&pixel);
+         Stencil_MoveRight(&pixel);
       }
 
       // Get the total black pixel count from all processes
