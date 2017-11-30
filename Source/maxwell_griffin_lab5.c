@@ -117,17 +117,17 @@ static int BlockSobelEdgeDetection(
    {
       myBlackPixelCount = 0;
 
-      // Initialize stencil to sit centered at input[1][1]
-      Stencil_t pixel = {
-         .top =    input + initialOffset - width,
-         .middle = input + initialOffset,
-         .bottom = input + initialOffset + width
-      };
-
       int i;
       #pragma omp parallel for
       for(i = 0; i < blockSize; i++)
       {
+         uint8_t *middlePixel = input + initialOffset + i;
+         Stencil_t pixel = {
+            .top =    middlePixel - width,
+            .middle = middlePixel,
+            .bottom = middlePixel + width
+         };
+
          if(IsBorderPixel(initialOffset + i, height, width))
          {
             output[i] = PIXEL_BLACK;
@@ -144,8 +144,6 @@ static int BlockSobelEdgeDetection(
                myBlackPixelCount++;
             }
          }
-
-         Stencil_MoveRight(&pixel);
       }
 
       // Get the total black pixel count from all processes
