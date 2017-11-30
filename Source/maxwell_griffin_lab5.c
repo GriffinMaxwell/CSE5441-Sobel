@@ -73,7 +73,7 @@ static void DisplayResults(
    int convergenceThreshold)
 {
    printf("MPI communicator size: %d\n", communicatorSize);
-   printf("OpenMP number of threads: %d\n, ompNumThreads");
+   printf("OpenMP number of threads: %d\n", ompNumThreads);
    printf("Time taken for MPI/OMP operation: %lf\n", executionTime);
    printf("Convergence Threshold: %d\n", convergenceThreshold);
    printf("********************************************************************************\n");
