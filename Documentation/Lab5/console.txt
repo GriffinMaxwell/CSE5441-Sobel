@@ -89,3 +89,50 @@ Convergence Threshold: 27
 ********************************************************************************
 -bash-4.2$ 
 
+
+-bash-4.2$ mpirun -np 16 ./lab5.out larger.bmp img16.bmp
+Image Info :: 
+	 Height=1200 Width=1920
+Image Info :: 
+	 Height=1200 Width=1920
+Image Info :: 
+	 Height=1200 Width=1920
+Image Info :: 
+	 Height=1200 Width=1920
+Image Info :: 
+	 Height=1200 Width=1920
+Image Info :: 
+	 Height=1200 Width=1920
+Image Info :: 
+	 Height=1200 Width=1920
+Image Info :: 
+	 Height=1200 Width=1920
+Image Info :: 
+	 Height=1200 Width=1920
+Image Info :: 
+	 Height=1200 Width=1920
+Image Info :: 
+	 Height=1200 Width=1920
+Image Info :: 
+	 Height=1200 Width=1920
+Image Info :: 
+	 Height=1200 Width=1920
+Image Info :: 
+	 Height=1200 Width=1920
+Image Info :: 
+	 Height=1200 Width=1920
+Image Info :: 
+	 Height=1200 Width=1920
+********************************************************************************
+lab5: Sobel edge detection using MPI and OpenMP.
+
+Input image: larger.bmp 	(Height: 1200 pixels, width: 1920 pixels)
+Output image: 	img16.bmp
+
+Performing Sobel edge detection.
+MPI communicator size: 16
+OpenMP number of threads: 16
+Time taken for MPI/OMP operation: 7.786451
+Convergence Threshold: 27
+********************************************************************************
+
