@@ -118,7 +118,7 @@ static int BlockSobelEdgeDetection(
       myBlackPixelCount = 0;
 
       int i;
-      #pragma omp parallel for
+      #pragma omp parallel for reduction( + : myBlackPixelCount)
       for(i = 0; i < blockSize; i++)
       {
          uint8_t *middlePixel = input + initialOffset + i;
