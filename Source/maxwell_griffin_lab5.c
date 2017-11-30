@@ -7,6 +7,7 @@
 #include <mpi.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 extern "C"
@@ -78,26 +79,45 @@ static void DisplayResults(
 }
 
 /*
- * Using MPI parallelization, perform Sobel edge detections on an input pixel
- * buffer at increasing brightness thresholds until convergence, i.e. 75% of
- * pixels in the output pixel buffer are black.
+ * Determines if a pixel is on the border of an image.
+ *
+ * @param offset -- offset of the pixel within the image buffer
+ * @param width -- total width of the image
+ * @param height -- total height of the image
+ */
+bool IsBorderPixel(int offset, int width, int height)
+{
+   return ((offset < width)
+      || (offset > (width * (height - 1)))
+      || (offset % width == 0)
+      || (offset % width == (width - 1)))
+}
+
+/*
+ * Using MPI parallelization, perform Sobel edge detections on a block of pixels
+ * in an input pixel buffer at increasing brightness thresholds until
+ * convergence, i.e. 75% of pixels in the output pixel buffer are black.
  *
  * @param input -- input pixel buffer
  * @param output -- output pixel buffer
  * @param height -- height of pixel image
  * @param width -- width of pixel image
+ * @param initialOffset -- the offset within the input buffer to start testing pixels
+ * @param blockSize -- i.e. the number of pixels in the output pixel buffer
  * @return -- gradient threshold at which PERCENT_BLACK_THRESHOLD pixels are black
  */
-static int SerialSobelEdgeDetection(
+static int BlockSobelEdgeDetection(
    uint8_t *input,
    uint8_t *output,
    int height,
-   int width)
+   int width,
+   int initialOffset,
+   int blockSize)
 {
-   int gradientThreshold, blackPixelCount = 0;
-   for(gradientThreshold = 0; blackPixelCount < (height * width * 3 / 4); gradientThreshold++)
+   int gradientThreshold, myBlackPixelCount = 0, totalBlackPixelCount = 0;
+   for(gradientThreshold = 0; totalBlackPixelCount < (height * width * 3 / 4); gradientThreshold++)
    {
-      blackPixelCount = 0;
+      myBlackPixelCount = 0;
 
       // Initialize stencil to sit centered at input[1][1]
       Stencil_t pixel = {
@@ -127,6 +147,9 @@ static int SerialSobelEdgeDetection(
 
          Stencil_MoveToNextRow(&pixel);
       }
+
+      // Get the total black pixel count from all processes
+      MPI_Allreduce(&myBlackPixelCount, &totalBlackPixelCount, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
    }
 
    return gradientThreshold;
@@ -140,16 +163,20 @@ int main(int argc, char *argv[])
    // Call MPI_Init to setup the MPI environment and shift out all the MPI-specific command line args
    MPI_Init(&argc, &argv);
 
-   struct timespec rtcStart;
-   struct timespec rtcEnd;
+   struct timespec rtcStart, rtcEnd;
+   int communicatorSize, myRank, masterProcessRank;
+   int slaveBlockSize, myBlockSize, myBufferSize;
+   int myInputOffset myOutputOffset, numExtraPixels;
+   int convergenceThreshold;
+   uint8_t *inputImageBuffer, *outputImageBuffer;
+   FILE *inputFile;
 
-   int communicatorSize, myRank;
    MPI_Comm_size(MPI_COMM_WORLD, &communicatorSize);
    MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
 
    // Define the "master process" as the process with the largest rank
    // Rank is zero indexed, so largest rank is communicator size - 1
-   const int masterProcessRank = communicatorSize - 1;
+   masterProcessRank = communicatorSize - 1;
 
    // Check for correct number of remaining command line args
    if (argc != 4)
@@ -159,41 +186,58 @@ int main(int argc, char *argv[])
    }
 
    // Open the input file specified by the command line arg
-   FILE *inputFile = fopen(argv[1], "rb");
+   inputFile = fopen(argv[1], "rb");
    if(inputFile == NULL)
    {
       printf("Error: %s could not be opened for reading.", argv[1]);
    }
 
-   // Buffers to hold the entire input image and whatever block of the output
-   // image buffer this process is processing
-   uint8_t *inputImage, *outputImageBlock;
-
    // Read input image, determine block size, and allocate output image buffer
-   inputImage = (uint8_t *)read_bmp_file(inputFile);
+   inputImageBuffer = (uint8_t *)read_bmp_file(inputFile);
 
    // Divvy out blocks of pixels to each process.
-   // The master process gets the extra pixels from uneven division
-   int slaveBlockSize = get_num_pixel() / communicatorSize;
-   int numExtraPixels = get_num_pixel() % communicatorSize;
-   int myBlockSize = (myRank == masterProcessRank) ? slaveBlockSize + numExtraPixels : slaveBlockSize
+   slaveBlockSize = get_num_pixel() / communicatorSize;
+   numExtraPixels = get_num_pixel() % communicatorSize;
 
-   outputImageBlock = (uint8_t *)malloc(myBlockSize);
+   // Calculate process-specific variables
+   // The master process gets the whole image buffer, plus the extra pixels from
+   // uneven division between the blocks
+   myBlockSize = (myRank == masterProcessRank) ? slaveBlockSize + numExtraPixels : slaveBlockSize;
+   myBufferSize = (myRank == masterProcessRank) ? get_num_pixel() : myBlockSize;
+   myInputOffset = myRank * slaveBlockSize;
+   myOutputOffset = (myRank == masterProcessRank) ? myInputOffset : 0;
+
+   outputImageBuffer = (uint8_t *)malloc(myBufferSize);
+
+   // Wait for all processes to read the image and allocate buffers
+   MPI_Barrier(MPI_COMM_WORLD);
 
    if(myRank == masterProcessRank)
    {
-      DisplayParameters(argv[1], argv[2], argv[3], get_image_height(), get_image_width());
+      DisplayParameters(argv[1], argv[2], get_image_height(), get_image_width());
 
       printf("Performing Sobel edge detection.\n");
       clock_gettime(CLOCK_REALTIME, &rtcStart);
    }
 
-   int convergenceThreshold = SerialSobelEdgeDetection(inputImage, outputImageBlock, get_image_height(), get_image_width());
+   convergenceThreshold = BlockSobelEdgeDetection(
+      inputImageBuffer,
+      &outputImageBuffer[myOutputOffset],
+      get_image_height(),
+      get_image_width(),
+      myInputOffset,
+      myBlockSize);
+
+   // Fill output pixel array with the pixels from all the processes
+   // Note: the the master process' pixels were written to their final spot in
+   // this buffer so they won't be stomped on and the extra pixels are already at the very end of the buffer
+   MPI_Gather(
+      outputImageBuffer, slaveBlockSize, MPI_UNSIGNED_CHAR,
+      inputImageBuffer, slaveBlockSize, MPI_UNSIGNED_CHAR,
+      masterProcessRank, MPI_COMM_WORLD);
 
    if(myRank == masterProcessRank)
    {
-      // Gather image pixels from all slaves
-
       clock_gettime(CLOCK_REALTIME, &rtcEnd);
 
       DisplayResults(
@@ -203,15 +247,12 @@ int main(int argc, char *argv[])
 
       // Write output image buffers. Closes files and frees buffers.
       FILE *outputFile = fopen(argv[2], "wb");
-      write_bmp_file(outputFile, outputImageBlock);
+      write_bmp_file(outputFile, outputImageBuffer);
    }
    else
    {
-      // Send image pixels to master
-
-      free(outputImageBlock)
+      free(outputImageBuffer);   // outputImageBuffer is already freed in master process by write_bmp_file()
    }
-
 
    MPI_Finalize();
 }
