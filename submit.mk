@@ -19,7 +19,7 @@ OBJS := \
 	Stencil.o \
 
 PROTECTED_OBJS := \
-	bmpReader.o \
+	gcc_bmpReader.o \
 
 
 all: $(TARGET_EXECUTABLES)
