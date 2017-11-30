@@ -16,12 +16,12 @@ TARGET_EXECUTABLES := \
 SRCS_LAB5 := $(shell find $(SRC_DIR) -name *.c)
 OBJ_LAB5 := \
 $(SRCS_LAB5:%=$(BUILD_DIR)/%.o) \
-	$(SRC_DIR)/bmpReader.o \
+	$(SRC_DIR)/gcc_bmpReader.o \
 
 all: $(TARGET_EXECUTABLES)
 
 $(TARGET_LAB5): $(OBJ_LAB5)
-	$(MPICC) $(MPI_FLAGS) -o $@ $(OBJ_LAB5)
+	$(MPI) $(MPI_FLAGS) -o $@ $(OBJ_LAB5)
 
 # c source
 $(BUILD_DIR)/%.c.o: %.c
