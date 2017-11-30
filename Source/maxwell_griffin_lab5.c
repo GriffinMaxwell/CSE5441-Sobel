@@ -126,7 +126,7 @@ static int BlockSobelEdgeDetection(
       int i;
       for(i = 0; i < blockSize; i++)
       {
-         if(IsBorderPixel(i, height, width))
+         if(IsBorderPixel(initialOffset + i, height, width))
          {
             output[i] = PIXEL_BLACK;
          }
@@ -214,7 +214,7 @@ int main(int argc, char *argv[])
    if(myRank == masterProcessRank)
    {
       int i;
-      for(i = 0; i <= communicatorSize - 1; i++)
+      for(i = 0; i < communicatorSize; i++)
       {
          outputBlockSizes[i] = slaveBlockSize;
          outputBlockOffsets[i] = slaveBlockSize * i;
