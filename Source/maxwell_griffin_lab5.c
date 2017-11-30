@@ -9,12 +9,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-
-extern "C"
-{
 #include "read_bmp.h"
 #include "Sobel.h"
-}
 
 #define PIXEL_BLACK (0)
 #define PIXEL_WHITE (255)
@@ -139,7 +135,7 @@ static int BlockSobelEdgeDetection(
       {
          if(IsBorderPixel(i, height, width))
          {
-               output[i] = PIXEL_BLACK;
+            output[i] = PIXEL_BLACK;
          }
          else
          {
